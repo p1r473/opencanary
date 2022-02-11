@@ -292,3 +292,36 @@ class TeamsHandler(logging.Handler):
         response = requests.post(self.webhook_url, headers=headers, json=payload)
         if response.status_code != 200:
             print("Error %s sending Teams message, the response was:\n%s" % (response.status_code, response.text))
+
+class PushoverHandler(logging.Handler):
+    def __init__(self,webhook_url):
+        logging.Handler.__init__(self)
+        self.webhook_url=webhook_url
+
+    def message(self, data):
+        message = {
+            "token": "",
+            "user": "",
+            "message": self.facts(data),
+            "title": "OpenCanary Alert"
+        }
+        return message
+
+    def facts(self, data, prefix=None):
+        facts = []
+        for k, v in data.items():
+            key = str(k).lower() if prefix is None else prefix + '__' + str(k).lower()
+            if type(v) is not dict:
+                facts.append({"name": key, "value": str(v)})
+            else:
+                nested = self.facts(v, key)
+                facts.extend(nested)
+        return facts
+
+    def emit(self, record):
+        data = json.loads(record.msg)
+        payload = self.message(data)
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(self.webhook_url, headers=headers, json=payload)
+        if response.status_code != 200:
+            print("Error %s sending Pushover message, the response was:\n%s" % (response.status_code, response.text))
